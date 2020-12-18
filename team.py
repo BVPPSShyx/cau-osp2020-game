@@ -16,7 +16,8 @@ from loa.exception import ArrangeTimeoutError
 class Team:
     def __init__(self,
                  name: str,
-                 units: List[Unit] = None):
+                 units: List[Unit] = None,
+                 init=True):
         
         utils.check_type("name", name, str)
         self._name = name
@@ -24,12 +25,17 @@ class Team:
         if units:
             utils.check_type("units", units, list)
             if len(units) != 0:
-                utils.check_type("units[0]", units[0], Unit)
+                for i, unit in enumerate(units):
+                    utils.check_type("units[%d]"%(i),
+                                     units[i],
+                                     Unit,
+                                     allow_none=True)
         else:
             units = []
             
         self._units = units
-        self.initialize()
+        if init:
+            self.initialize()
         
         
         
@@ -57,12 +63,22 @@ class Team:
         set_team1 = set(self.units)
         set_team2 = set(other.units)
         
-        return set_team1 == set_team2
-            
+        return set_team1 == set_team2        
 
     def __ne__(self, other: Team):        
         return not self.__eq__(other)
-        
+ 
+    def copy(self):
+        units = []
+        for unit in self.units:
+            if unit:
+                units.append(unit.copy())
+            else:
+                units.append(None)
+                
+        cls = self.__class__
+        obj = cls(self.name, units, init=False)
+        return obj
         
     @property
     def name(self):
@@ -94,19 +110,83 @@ class Team:
         """
         pass
 
+class Noun1(Unit):
+    HP = 29  
+    ATT = 0  
+    ARM = 11 
+    EVS = 0  
+
+    def __init__(self, team, name, pos):
+        cls = __class__
+        super().__init__(team,
+                          name,
+                          pos,
+                          hp=cls.HP,
+                          att=cls.ATT,
+                          arm=cls.ARM,
+                          evs=cls.EVS)
+
+
+class Noun2(Unit):
+    HP = 30.0001  # Hit Points (health points)
+    ATT = 0  # Attack
+    ARM = 5.0001  # Armor
+    EVS = 0  # Evasion
+
+    def __init__(self, team, name, pos):
+        cls = __class__
+        super().__init__(team,
+                          name,
+                          pos,
+                          hp=cls.HP,
+                          att=cls.ATT,
+                          arm=cls.ARM,
+                          evs=cls.EVS)
+class Noun3(Unit):
+    HP = 30.0001  # Hit Points (health points)
+    ATT = 0  # Attack
+    ARM = 9.9999  # Armor
+    EVS = 0  # Evasion
+
+    def __init__(self, team, name, pos):
+        cls = __class__
+        super().__init__(team,
+                          name,
+                          pos,
+                          hp=cls.HP,
+                          att=cls.ATT,
+                          arm=cls.ARM,
+                          evs=cls.EVS)
+
+class MyTeam1(Team):
+    def initialize(self):
+        for i in range(6):
+            unit = Noun1(self, "A-Unit%02d" % (i + 1), i)
+            self.units.append(unit)
+        for i in range (6,10):
+            unit = Noun2(self, "A-Unit%02d" % (i + 1), i)
+            self.units.append(unit)
+            
     def arrange(self, enemy: Team):
-        raise NotImplementedError()
-        first_unit = self.units[0]
-        for i in range(self.num_positions - 1):
-            j = i + 1 
-            self.units[i] = self.units[j]
-            if self.units[i] != None:
-               self.units[i].pos = i 
-        # end of for
-        self.units[-1] = first_unit
-        if self.units[-1] != None:
-            self.units[-1].pos = self.num_positions - 1
-              
+        pass
+            
+class MyTeam2(Team):
+    def initialize(self):
+        for i in range(10):
+            unit = Noun1(self, "A-Unit%02d" % (i + 1), i)
+            self.units.append(unit)
+            
+    def arrange(self, enemy: Team):
+        pass
+            
+class MyTeam3(Team):
+    def initialize(self):
+        for i in range(10):
+            unit = Noun3(self, "A-Unit%02d" % (i + 1), i)
+            self.units.append(unit)
+
+    def arrange(self, enemy: Team):
+        pass
         
 class TeamExaminer:
     
@@ -126,6 +206,7 @@ class TeamExaminer:
         self._check_positions(team)
         self._check_constraints(team, league_round)
         self._check_arrange(team, copy.deepcopy(team), league_round)
+        return True
     
     def check_play(self,
                    offense: Team,
@@ -145,7 +226,9 @@ class TeamExaminer:
         self._check_positions(defense)
 
         self._check_arrange(offense, defense, league_round)
-        
+        return True
+    
+    
     def _check_unit_type(self, unit: Unit):
         if not isinstance(unit, Unit):
             err_msg = "An element of Team should be Unit type, " \
@@ -155,15 +238,19 @@ class TeamExaminer:
                 
     def _check_unit_attribute(self, unit: Unit, attr: str):        
         if not hasattr(unit, attr):
+            
+            print("[NO ATTR]", unit.team.name, unit.name)
             err_msg = "[%s] Unit should have attribute: %s!" \
                       %(type(unit), attr)
             raise AttributeError(err_msg)
+
             
     def _check_team_attribute(self, team: Team, attr: str):        
         if not hasattr(team, attr):
             err_msg = "[%s] Unit should have attribute: %s!" \
                       %(type(team), attr)
             raise AttributeError(err_msg)
+
             
     def _check_types(self, team: Team):
         utils.check_type("team", team, Team)        
@@ -174,11 +261,13 @@ class TeamExaminer:
             self._check_unit_type(unit)
         # end of for
     
+    
     def _check_name(self, team: Team):
         if team.name.isspace() or len(team.name.split()) == 0:
             err_msg = "Team name cannot be whitespace!"
             write_log(err_msg)
             raise ValueError(err_msg)
+    
     
     def _check_attributes(self, team: Team):
         utils.check_type("team", team, Team)
@@ -216,7 +305,6 @@ class TeamExaminer:
                 raise ValueError(err_msg%(team.name, i, unit.pos))
                 
                 
-        
     def _check_unit_uniqueness(self, team: Team):
                 
         set_ids = set([id(unit) for unit in team])
@@ -303,15 +391,13 @@ class TeamExaminer:
             CONS_UNIT_MIN_HP = CONS_TEAM['UNIT_MIN_HP']
             CONS_UNIT_MAX_EVS = CONS_TEAM['UNIT_MAX_EVS']
             CONS_UNIT_SUM_HP_ATT_1d5ARM = CONS_TEAM['UNIT_SUM_HP_ATT_1d5ARM']
-            
-            
+                        
             if len(team) != CONS_NUM_UNITS:
                 err_msg = "[%s] The number of units should be" \
                           " %d, not %d"%(team.name, CONS_NUM_UNITS, len(team))
                 write_log(err_msg)
                 raise ValueError(err_msg)
-            
-            
+                        
             for unit in team:
                 if unit.ATT > CONS_UNIT_MAX_ATT:
                     err_msg = "[%s] The ATT of each unit should be " \
@@ -359,7 +445,17 @@ class TeamExaminer:
                 # end of if
                 
             # end of for
-            
+        elif league_round == "ROUND-03":
+            CONS_TEAM = constraints[league_round]['TEAM']
+            CONS_UNIT_MAX_EVS = CONS_TEAM['UNIT_MAX_EVS']
+
+            for unit in team:                
+                if unit.evs > 0:
+                    err_msg = "[%s] The evs of each unit should be zero, " \
+                              "not %.2f!"%(unit.name, unit.evs)
+                    write_log(err_msg)
+                    raise ValueError(err_msg)
+                # end of if                
         else:
             err_msg = "league_round=%s is not defined!"%(league_round)
             write_log(err_msg)
@@ -370,7 +466,9 @@ class TeamExaminer:
             league_round = "ROUND-01"
                     
         league_round = league_round.upper()
-        if league_round in ("ROUND-01", "ROUND-02"):
+        if league_round in ("ROUND-01",
+                            "ROUND-02",
+                            "ROUND-03"):
             CONS_TEAM = self._constraints[league_round]['TEAM']
             if 'ARRANGE_TIME_LIMIT' in CONS_TEAM:
                 return CONS_TEAM['ARRANGE_TIME_LIMIT']
@@ -381,6 +479,9 @@ class TeamExaminer:
                        offense: Team,
                        defense: Team,
                        league_round=None):
+        
+        if offense.num_positions == defense.num_positions == 0:
+            return
         
         offense_cpy = copy.deepcopy(offense)
         defense_cpy = copy.deepcopy(defense)
